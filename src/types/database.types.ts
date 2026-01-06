@@ -351,6 +351,97 @@ export interface Database {
           created_at?: string;
         };
       };
+      design_tool_connections: {
+        Row: {
+          id: string;
+          user_id: string;
+          tool_name: 'figma' | 'canva';
+          access_token: string;
+          refresh_token: string | null;
+          token_expires_at: string | null;
+          account_email: string | null;
+          account_name: string | null;
+          metadata: any;
+          is_active: boolean;
+          last_synced_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          tool_name: 'figma' | 'canva';
+          access_token: string;
+          refresh_token?: string | null;
+          token_expires_at?: string | null;
+          account_email?: string | null;
+          account_name?: string | null;
+          metadata?: any;
+          is_active?: boolean;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          tool_name?: 'figma' | 'canva';
+          access_token?: string;
+          refresh_token?: string | null;
+          token_expires_at?: string | null;
+          account_email?: string | null;
+          account_name?: string | null;
+          metadata?: any;
+          is_active?: boolean;
+          last_synced_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      imported_designs: {
+        Row: {
+          id: string;
+          user_id: string;
+          connection_id: string;
+          tool_name: 'figma' | 'canva';
+          external_id: string;
+          file_name: string;
+          file_url: string | null;
+          thumbnail_url: string | null;
+          export_url: string | null;
+          metadata: any;
+          imported_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          connection_id: string;
+          tool_name: 'figma' | 'canva';
+          external_id: string;
+          file_name: string;
+          file_url?: string | null;
+          thumbnail_url?: string | null;
+          export_url?: string | null;
+          metadata?: any;
+          imported_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          connection_id?: string;
+          tool_name?: 'figma' | 'canva';
+          external_id?: string;
+          file_name?: string;
+          file_url?: string | null;
+          thumbnail_url?: string | null;
+          export_url?: string | null;
+          metadata?: any;
+          imported_at?: string;
+          created_at?: string;
+        };
+      };
     };
   };
 }

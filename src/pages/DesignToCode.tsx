@@ -2,52 +2,81 @@ import { useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DesignUploader } from '../components/design/DesignUploader';
-import { Wand2, ArrowRight, Code2, Boxes } from 'lucide-react';
+import { DesignToolConnector } from '../components/design/DesignToolConnector';
+import { FileBrowser } from '../components/design/FileBrowser';
+import { Wand2, ArrowRight, Code2, Boxes, Upload, FileImage } from 'lucide-react';
+
+type ImportSource = 'upload' | 'figma' | 'canva';
 
 export function DesignToCode() {
   const { user } = useAuth();
+  const [importSource, setImportSource] = useState<ImportSource>('upload');
   const [name, setName] = useState('');
   const [conversionType, setConversionType] = useState<'html' | 'divi' | 'elementor'>('html');
   const [prompt, setPrompt] = useState('');
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string>('');
+  const [selectedDesignFile, setSelectedDesignFile] = useState<any>(null);
   const [submitting, setSubmitting] = useState(false);
 
   const handleImageSelect = (file: File, preview: string) => {
     setImageFile(file);
     setImagePreview(preview);
+    setSelectedDesignFile(null);
+  };
+
+  const handleDesignFileSelect = (file: any) => {
+    setSelectedDesignFile(file);
+    setImageFile(null);
+    setImagePreview('');
+    setName(file.name);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!imageFile || !user || !name) return;
+    if (!user || !name) return;
+    if (importSource === 'upload' && !imageFile) return;
+    if ((importSource === 'figma' || importSource === 'canva') && !selectedDesignFile) return;
 
     setSubmitting(true);
 
     try {
-      const fileExt = imageFile.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      let imageUrl = '';
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('design-images')
-        .upload(fileName, imageFile);
+      if (importSource === 'upload' && imageFile) {
+        const fileExt = imageFile.name.split('.').pop();
+        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-      if (uploadError) {
-        const { data: { publicUrl } } = supabase.storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from('design-images')
-          .getPublicUrl(fileName);
+          .upload(fileName, imageFile);
 
-        await createConversion(publicUrl);
-      } else {
-        const { data: { publicUrl } } = supabase.storage
-          .from('design-images')
-          .getPublicUrl(uploadData.path);
+        if (uploadError) {
+          const { data: { publicUrl } } = supabase.storage
+            .from('design-images')
+            .getPublicUrl(fileName);
+          imageUrl = publicUrl;
+        } else {
+          const { data: { publicUrl } } = supabase.storage
+            .from('design-images')
+            .getPublicUrl(uploadData.path);
+          imageUrl = publicUrl;
+        }
+      } else if ((importSource === 'figma' || importSource === 'canva') && selectedDesignFile) {
+        imageUrl = selectedDesignFile.thumbnail || selectedDesignFile.url;
+      }
 
-        await createConversion(publicUrl);
+      if (imageUrl) {
+        await createConversion(imageUrl);
       }
     } catch (error) {
-      console.error('Error uploading image:', error);
-      await createConversion(imagePreview);
+      console.error('Error processing design:', error);
+      if (imagePreview) {
+        await createConversion(imagePreview);
+      } else {
+        alert('Failed to process design. Please try again.');
+        setSubmitting(false);
+      }
     }
   };
 
@@ -72,6 +101,7 @@ export function DesignToCode() {
       setPrompt('');
       setImageFile(null);
       setImagePreview('');
+      setSelectedDesignFile(null);
       alert('Conversion started! Check your conversions tab to see the results.');
     }
 
@@ -181,8 +211,72 @@ export function DesignToCode() {
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload Design</h2>
-          <DesignUploader onImageSelect={handleImageSelect} currentImage={imagePreview} />
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Design Source</h2>
+
+          <div className="mb-6">
+            <div className="flex border-b border-gray-200">
+              <button
+                type="button"
+                onClick={() => setImportSource('upload')}
+                className={`flex items-center px-4 py-2 border-b-2 transition-colors ${
+                  importSource === 'upload'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Upload Image
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportSource('figma')}
+                className={`flex items-center px-4 py-2 border-b-2 transition-colors ${
+                  importSource === 'figma'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                🎨 Import from Figma
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportSource('canva')}
+                className={`flex items-center px-4 py-2 border-b-2 transition-colors ${
+                  importSource === 'canva'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                ✨ Import from Canva
+              </button>
+            </div>
+          </div>
+
+          {importSource === 'upload' && (
+            <DesignUploader onImageSelect={handleImageSelect} currentImage={imagePreview} />
+          )}
+
+          {importSource === 'figma' && (
+            <div className="space-y-4">
+              <DesignToolConnector toolName="figma" />
+              <FileBrowser
+                toolName="figma"
+                onSelect={handleDesignFileSelect}
+                selectedFileId={selectedDesignFile?.id}
+              />
+            </div>
+          )}
+
+          {importSource === 'canva' && (
+            <div className="space-y-4">
+              <DesignToolConnector toolName="canva" />
+              <FileBrowser
+                toolName="canva"
+                onSelect={handleDesignFileSelect}
+                selectedFileId={selectedDesignFile?.id}
+              />
+            </div>
+          )}
         </div>
 
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -203,7 +297,12 @@ export function DesignToCode() {
 
         <button
           type="submit"
-          disabled={!imageFile || !name || submitting}
+          disabled={
+            !name ||
+            submitting ||
+            (importSource === 'upload' && !imageFile) ||
+            ((importSource === 'figma' || importSource === 'canva') && !selectedDesignFile)
+          }
           className="w-full flex items-center justify-center px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-md transition-colors"
         >
           {submitting ? (

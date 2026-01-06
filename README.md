@@ -66,13 +66,21 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions on all options.
 
 ## Documentation
 
+### Installation & Deployment
 - [INSTALLATION.md](./INSTALLATION.md) - General installation guide
 - [CPANEL_INSTALLATION.md](./CPANEL_INSTALLATION.md) - cPanel/AlmaLinux specific guide
+- [CPANEL_QUICK_START.md](./CPANEL_QUICK_START.md) - 5-minute cPanel deployment
 - [DEPLOYMENT.md](./DEPLOYMENT.md) - Deployment options and strategies
 - [SETUP_WIZARD.md](./SETUP_WIZARD.md) - Setup wizard documentation
+
+### Features & Administration
 - [ADMIN_SETUP.md](./ADMIN_SETUP.md) - Admin system documentation
 - [DESIGN_TO_CODE.md](./DESIGN_TO_CODE.md) - Design conversion features
 - [FIGMA_CANVA_INTEGRATION.md](./FIGMA_CANVA_INTEGRATION.md) - Design tool integrations
+
+### Security
+- [SECURITY_AUDIT.md](./SECURITY_AUDIT.md) - Complete security audit report
+- [SECURITY_CHECKLIST.md](./SECURITY_CHECKLIST.md) - Security maintenance checklist
 
 ## Technology Stack
 

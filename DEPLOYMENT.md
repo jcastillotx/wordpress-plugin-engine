@@ -2,6 +2,16 @@
 
 This guide covers deploying the Plugin Builder application to a Linux server with PostgreSQL.
 
+## Setup Wizard
+
+The application includes a built-in setup wizard that runs automatically on first deployment. When you first access the application, you'll be guided through:
+
+1. Database connection configuration
+2. Database migration setup
+3. Creating your first admin account
+
+The wizard will delete itself automatically after successful setup, ensuring it only runs once.
+
 ## Current Architecture
 
 This application is currently built with Supabase, which provides:

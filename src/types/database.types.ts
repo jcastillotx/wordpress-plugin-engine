@@ -8,6 +8,7 @@ export interface Database {
           subscription_tier: 'free' | 'pro' | 'enterprise';
           subscription_status: 'trial' | 'active' | 'cancelled' | 'expired';
           trial_ends_at: string | null;
+          role: 'user' | 'admin';
           created_at: string;
           updated_at: string;
         };
@@ -17,6 +18,7 @@ export interface Database {
           subscription_tier?: 'free' | 'pro' | 'enterprise';
           subscription_status?: 'trial' | 'active' | 'cancelled' | 'expired';
           trial_ends_at?: string | null;
+          role?: 'user' | 'admin';
           created_at?: string;
           updated_at?: string;
         };
@@ -26,6 +28,7 @@ export interface Database {
           subscription_tier?: 'free' | 'pro' | 'enterprise';
           subscription_status?: 'trial' | 'active' | 'cancelled' | 'expired';
           trial_ends_at?: string | null;
+          role?: 'user' | 'admin';
           created_at?: string;
           updated_at?: string;
         };
@@ -148,6 +151,93 @@ export interface Database {
           current_period_end?: string;
           created_at?: string;
           updated_at?: string;
+        };
+      };
+      pages: {
+        Row: {
+          id: string;
+          slug: string;
+          title: string;
+          content: any;
+          template: string;
+          published: boolean;
+          meta_title: string;
+          meta_description: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          title: string;
+          content?: any;
+          template?: string;
+          published?: boolean;
+          meta_title?: string;
+          meta_description?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          title?: string;
+          content?: any;
+          template?: string;
+          published?: boolean;
+          meta_title?: string;
+          meta_description?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      site_settings: {
+        Row: {
+          id: string;
+          key: string;
+          value: any;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          key: string;
+          value?: any;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          key?: string;
+          value?: any;
+          updated_at?: string;
+        };
+      };
+      admin_logs: {
+        Row: {
+          id: string;
+          admin_id: string | null;
+          action: string;
+          resource_type: string | null;
+          resource_id: string | null;
+          details: any;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          admin_id?: string | null;
+          action: string;
+          resource_type?: string | null;
+          resource_id?: string | null;
+          details?: any;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          admin_id?: string | null;
+          action?: string;
+          resource_type?: string | null;
+          resource_id?: string | null;
+          details?: any;
+          created_at?: string;
         };
       };
     };

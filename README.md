@@ -66,7 +66,8 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions on all options.
 
 ## Documentation
 
-- [INSTALLATION.md](./INSTALLATION.md) - Step-by-step installation guide
+- [INSTALLATION.md](./INSTALLATION.md) - General installation guide
+- [CPANEL_INSTALLATION.md](./CPANEL_INSTALLATION.md) - cPanel/AlmaLinux specific guide
 - [DEPLOYMENT.md](./DEPLOYMENT.md) - Deployment options and strategies
 - [SETUP_WIZARD.md](./SETUP_WIZARD.md) - Setup wizard documentation
 - [ADMIN_SETUP.md](./ADMIN_SETUP.md) - Admin system documentation

@@ -2,6 +2,12 @@
 
 This guide walks you through installing the Plugin Builder application on your Linux server.
 
+## Choose Your Installation Guide
+
+- **cPanel/AlmaLinux Users**: See [CPANEL_INSTALLATION.md](./CPANEL_INSTALLATION.md)
+- **Ubuntu/Debian with Nginx**: Continue below
+- **Other Linux distributions**: Adapt the instructions below
+
 ## Quick Start
 
 1. Deploy Supabase (or use hosted Supabase)
@@ -11,10 +17,10 @@ This guide walks you through installing the Plugin Builder application on your L
 
 ## Prerequisites
 
-- Linux server (Ubuntu 20.04+ recommended)
+- Linux server (Ubuntu 20.04+ recommended, or AlmaLinux 8+)
 - Docker and Docker Compose (for self-hosted Supabase)
 - Node.js 18+ and npm
-- Nginx (for serving the application)
+- Nginx (for serving the application) or cPanel
 - Domain name with SSL certificate (recommended)
 
 ## Step 1: Deploy Supabase

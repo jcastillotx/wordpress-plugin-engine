@@ -1,9 +1,9 @@
-import { Code2, LayoutDashboard, Plus, Package, CreditCard, HelpCircle, LogOut } from 'lucide-react';
+import { Code2, LayoutDashboard, Plus, Package, CreditCard, HelpCircle, LogOut, Wand2, Image } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface NavigationProps {
-  currentView: 'dashboard' | 'new-plugin' | 'plugins' | 'billing' | 'help';
-  onNavigate: (view: 'dashboard' | 'new-plugin' | 'plugins' | 'billing' | 'help') => void;
+  currentView: 'dashboard' | 'new-plugin' | 'plugins' | 'billing' | 'help' | 'design-to-code' | 'conversions';
+  onNavigate: (view: 'dashboard' | 'new-plugin' | 'plugins' | 'billing' | 'help' | 'design-to-code' | 'conversions') => void;
 }
 
 export function Navigation({ currentView, onNavigate }: NavigationProps) {
@@ -13,6 +13,8 @@ export function Navigation({ currentView, onNavigate }: NavigationProps) {
     { id: 'dashboard' as const, label: 'Dashboard', icon: LayoutDashboard },
     { id: 'new-plugin' as const, label: 'New Plugin', icon: Plus },
     { id: 'plugins' as const, label: 'My Plugins', icon: Package },
+    { id: 'design-to-code' as const, label: 'Design to Code', icon: Wand2 },
+    { id: 'conversions' as const, label: 'My Conversions', icon: Image },
     { id: 'billing' as const, label: 'Billing', icon: CreditCard },
     { id: 'help' as const, label: 'Help', icon: HelpCircle },
   ];

@@ -7,6 +7,8 @@ import { NewPlugin } from './pages/NewPlugin';
 import { MyPlugins } from './pages/MyPlugins';
 import { Billing } from './pages/Billing';
 import { Help } from './pages/Help';
+import { DesignToCode } from './pages/DesignToCode';
+import { MyConversions } from './pages/MyConversions';
 import { Layout } from './components/layout/Layout';
 import { AdminNavigation } from './components/admin/AdminNavigation';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -18,7 +20,7 @@ import { AdminSettings } from './pages/admin/AdminSettings';
 function AppContent() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
-  const [currentView, setCurrentView] = useState<'dashboard' | 'new-plugin' | 'plugins' | 'billing' | 'help'>('dashboard');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'new-plugin' | 'plugins' | 'billing' | 'help' | 'design-to-code' | 'conversions'>('dashboard');
   const [adminView, setAdminView] = useState<'dashboard' | 'subscriptions' | 'plugins' | 'pages' | 'settings'>('dashboard');
 
   if (authLoading || adminLoading) {
@@ -57,6 +59,8 @@ function AppContent() {
       {currentView === 'dashboard' && <Dashboard />}
       {currentView === 'new-plugin' && <NewPlugin onSuccess={handlePluginSuccess} />}
       {currentView === 'plugins' && <MyPlugins />}
+      {currentView === 'design-to-code' && <DesignToCode />}
+      {currentView === 'conversions' && <MyConversions />}
       {currentView === 'billing' && <Billing />}
       {currentView === 'help' && <Help />}
     </Layout>

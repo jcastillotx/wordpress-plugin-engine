@@ -20,32 +20,80 @@ export default function Setup() {
   const [migrationStatus, setMigrationStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [migrationMessage, setMigrationMessage] = useState('');
 
+  const isValidUrl = (url: string): boolean => {
+    try {
+      const parsed = new URL(url);
+      return parsed.protocol === 'https:' || parsed.protocol === 'http:';
+    } catch {
+      return false;
+    }
+  };
+
   const testConnection = async () => {
     if (!supabaseUrl || !supabaseAnonKey) {
       setConnectionTest({ status: 'error', message: 'Please fill in all fields' });
       return;
     }
 
+    const trimmedUrl = supabaseUrl.trim();
+
+    if (!isValidUrl(trimmedUrl)) {
+      setConnectionTest({
+        status: 'error',
+        message: 'Invalid URL format. Please enter a valid Supabase URL (e.g., https://your-project.supabase.co)'
+      });
+      return;
+    }
+
     setConnectionTest({ status: 'testing', message: 'Testing connection...' });
 
     try {
-      const testClient = createClient(supabaseUrl, supabaseAnonKey);
-      const { error } = await testClient.from('_test_').select('*').limit(1);
+      const testClient = createClient(trimmedUrl, supabaseAnonKey.trim());
 
-      if (error && !error.message.includes('does not exist')) {
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('TIMEOUT')), 15000);
+      });
+
+      // Race between the actual request and timeout
+      const result = await Promise.race([
+        testClient.from('_test_').select('*').limit(1),
+        timeoutPromise
+      ]) as { error?: any };
+
+      const error = result?.error;
+
+      if (error && !error.message?.includes('does not exist')) {
         throw error;
       }
 
       setConnectionTest({ status: 'success', message: 'Connection successful!' });
 
-      localStorage.setItem('VITE_SUPABASE_URL', supabaseUrl);
-      localStorage.setItem('VITE_SUPABASE_ANON_KEY', supabaseAnonKey);
+      localStorage.setItem('VITE_SUPABASE_URL', trimmedUrl);
+      localStorage.setItem('VITE_SUPABASE_ANON_KEY', supabaseAnonKey.trim());
 
       setTimeout(() => setStep('testing'), 1500);
     } catch (error: any) {
+      let errorMessage = 'Connection failed: ';
+
+      if (error.message === 'TIMEOUT') {
+        errorMessage += 'Connection timed out. Please check your URL and network connection.';
+      } else if (error instanceof TypeError || error.name === 'TypeError') {
+        // Network errors often manifest as TypeError
+        errorMessage += 'Unable to reach the server. Please verify the URL is correct and the server is accessible.';
+      } else if (error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
+        errorMessage += 'Network error. Please check your internet connection and verify the Supabase URL is correct.';
+      } else if (error.message?.includes('Invalid API key') || error.message?.includes('invalid_key')) {
+        errorMessage += 'Invalid API key. Please check your Supabase anon key.';
+      } else if (error.message?.includes('CORS') || error.message?.includes('cross-origin')) {
+        errorMessage += 'CORS error. The server may not be configured to accept requests from this origin.';
+      } else {
+        errorMessage += error.message || 'Unknown error occurred. Please check your credentials and try again.';
+      }
+
       setConnectionTest({
         status: 'error',
-        message: `Connection failed: ${error.message || 'Unknown error'}`
+        message: errorMessage
       });
     }
   };
@@ -55,15 +103,23 @@ export default function Setup() {
     setMigrationMessage('Checking database setup...');
 
     try {
-      const testClient = createClient(supabaseUrl, supabaseAnonKey);
+      const trimmedUrl = supabaseUrl.trim();
+      const testClient = createClient(trimmedUrl, supabaseAnonKey.trim());
 
-      const { data, error } = await testClient
-        .from('profiles')
-        .select('id')
-        .limit(1);
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('TIMEOUT')), 15000);
+      });
+
+      const result = await Promise.race([
+        testClient.from('profiles').select('id').limit(1),
+        timeoutPromise
+      ]) as { data?: any; error?: any };
+
+      const { error } = result;
 
       if (error) {
-        if (error.message.includes('does not exist') || error.code === 'PGRST204') {
+        if (error.message?.includes('does not exist') || error.code === 'PGRST204') {
           setMigrationStatus('error');
           setMigrationMessage('Database tables not found. Please run migrations first.');
           return;
@@ -75,8 +131,20 @@ export default function Setup() {
       setMigrationMessage('Database is properly configured!');
       setTimeout(() => setStep('admin'), 1500);
     } catch (error: any) {
+      let errorMessage = 'Database check failed: ';
+
+      if (error.message === 'TIMEOUT') {
+        errorMessage += 'Connection timed out. Please check your network connection.';
+      } else if (error instanceof TypeError || error.name === 'TypeError') {
+        errorMessage += 'Unable to reach the server. Please check your network connection.';
+      } else if (error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
+        errorMessage += 'Network error. Please check your internet connection.';
+      } else {
+        errorMessage += error.message || 'Unknown error occurred.';
+      }
+
       setMigrationStatus('error');
-      setMigrationMessage(`Database check failed: ${error.message}`);
+      setMigrationMessage(errorMessage);
     }
   };
 
@@ -92,16 +160,27 @@ export default function Setup() {
     }
 
     try {
-      const supabase = createClient(supabaseUrl, supabaseAnonKey);
+      const trimmedUrl = supabaseUrl.trim();
+      const supabase = createClient(trimmedUrl, supabaseAnonKey.trim());
 
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: adminEmail,
-        password: adminPassword
+      // Create a timeout promise
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('TIMEOUT')), 20000);
       });
 
-      if (authError) throw authError;
+      const signUpResult = await Promise.race([
+        supabase.auth.signUp({
+          email: adminEmail,
+          password: adminPassword
+        }),
+        timeoutPromise
+      ]) as { data?: any; error?: any };
 
-      if (authData.user) {
+      if (signUpResult.error) throw signUpResult.error;
+
+      const authData = signUpResult.data;
+
+      if (authData?.user) {
         const { error: profileError } = await supabase
           .from('profiles')
           .insert({
@@ -127,7 +206,19 @@ export default function Setup() {
       markSetupComplete(adminEmail);
       setStep('complete');
     } catch (error: any) {
-      alert(`Failed to create admin user: ${error.message}`);
+      let errorMessage = 'Failed to create admin user: ';
+
+      if (error.message === 'TIMEOUT') {
+        errorMessage += 'Connection timed out. Please check your network connection and try again.';
+      } else if (error instanceof TypeError || error.name === 'TypeError') {
+        errorMessage += 'Unable to reach the server. Please check your network connection.';
+      } else if (error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
+        errorMessage += 'Network error. Please check your internet connection.';
+      } else {
+        errorMessage += error.message || 'Unknown error occurred.';
+      }
+
+      alert(errorMessage);
     }
   };
 

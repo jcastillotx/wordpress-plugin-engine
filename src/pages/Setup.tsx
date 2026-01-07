@@ -69,6 +69,7 @@ export default function Setup() {
     }
 
     const trimmedUrl = supabaseUrl.trim();
+    const trimmedKey = supabaseAnonKey.trim();
 
     if (!isValidUrl(trimmedUrl)) {
       setConnectionTest({
@@ -82,42 +83,46 @@ export default function Setup() {
     setConnectionTest({ status: 'testing', message: 'Testing connection...', supabaseType });
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-connection`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            supabaseUrl: trimmedUrl,
-            supabaseKey: supabaseAnonKey.trim(),
-            testType: 'connection',
-          }),
-        }
+      // Test connection directly using the user-provided credentials
+      const testClient = createClient(trimmedUrl, trimmedKey);
+
+      // Try to query a non-existent table - connection success means we can reach Supabase
+      const { error } = await testClient.from('_test_connection_').select('*').limit(1);
+
+      // These errors indicate the connection worked but the table doesn't exist (expected)
+      const tableMissingErrors = [
+        'does not exist',
+        'relation "_test_connection_" does not exist',
+        'Could not find the table',
+        'schema cache'
+      ];
+
+      const isConnectionSuccess = !error || tableMissingErrors.some(msg =>
+        error.message?.includes(msg) || error.hint?.includes(msg)
       );
 
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Connection failed');
+      if (!isConnectionSuccess) {
+        throw new Error(error?.message || 'Connection failed');
       }
 
       setConnectionTest({
         status: 'success',
-        message: result.message || 'Connection successful!',
+        message: 'Connection successful!',
         supabaseType
       });
 
       localStorage.setItem('VITE_SUPABASE_URL', trimmedUrl);
-      localStorage.setItem('VITE_SUPABASE_ANON_KEY', supabaseAnonKey.trim());
+      localStorage.setItem('VITE_SUPABASE_ANON_KEY', trimmedKey);
 
       setTimeout(() => setStep('testing'), 1500);
     } catch (error: any) {
       let errorMessage = 'Connection failed: ';
+      let isCorsError = false;
 
-      if (error.message) {
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
+        errorMessage = 'Connection failed: Unable to reach Supabase. Please check your URL and ensure CORS is configured.';
+        isCorsError = true;
+      } else if (error.message) {
         errorMessage += error.message;
       } else {
         errorMessage += 'Unknown error occurred.';
@@ -126,7 +131,7 @@ export default function Setup() {
       setConnectionTest({
         status: 'error',
         message: errorMessage,
-        corsError: false,
+        corsError: isCorsError,
         supabaseType
       });
     }
@@ -137,36 +142,38 @@ export default function Setup() {
     setMigrationMessage('Checking database setup...');
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-connection`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            supabaseUrl: supabaseUrl.trim(),
-            supabaseKey: supabaseAnonKey.trim(),
-            testType: 'migration',
-          }),
+      const trimmedUrl = supabaseUrl.trim();
+      const trimmedKey = supabaseAnonKey.trim();
+
+      // Check migrations directly using the user-provided credentials
+      const testClient = createClient(trimmedUrl, trimmedKey);
+
+      // Check if the profiles table exists (indicates migrations have been run)
+      const { error } = await testClient.from('profiles').select('id').limit(1);
+
+      if (error) {
+        const tableMissingErrors = [
+          'does not exist',
+          'relation "profiles" does not exist',
+          'Could not find the table',
+          'schema cache'
+        ];
+
+        const isTableMissing = tableMissingErrors.some(msg =>
+          error.message?.includes(msg) || error.hint?.includes(msg)
+        ) || error.code === 'PGRST204';
+
+        if (isTableMissing) {
+          setMigrationStatus('error');
+          setMigrationMessage('Database tables not found. Please run migrations first.');
+          return;
         }
-      );
 
-      const result = await response.json();
-
-      if (result.migrationNeeded) {
-        setMigrationStatus('error');
-        setMigrationMessage(result.message || 'Database tables not found. Please run migrations first.');
-        return;
-      }
-
-      if (!result.success) {
-        throw new Error(result.error || 'Database check failed');
+        throw new Error(error.message || 'Database check failed');
       }
 
       setMigrationStatus('success');
-      setMigrationMessage(result.message || 'Database is properly configured!');
+      setMigrationMessage('Database is properly configured!');
       setTimeout(() => setStep('admin'), 1500);
     } catch (error: any) {
       let errorMessage = 'Database check failed: ';
@@ -194,31 +201,47 @@ export default function Setup() {
     }
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify({
-            supabaseUrl: supabaseUrl.trim(),
-            supabaseKey: supabaseAnonKey.trim(),
-            email: adminEmail,
-            password: adminPassword,
-          }),
-        }
-      );
+      const trimmedUrl = supabaseUrl.trim();
+      const trimmedKey = supabaseAnonKey.trim();
 
-      const result = await response.json();
+      // Create admin user directly using the user-provided credentials
+      const adminClient = createClient(trimmedUrl, trimmedKey);
 
-      if (!result.success) {
-        throw new Error(result.error || 'Failed to create admin user');
+      // Sign up the admin user
+      const { data: signUpData, error: signUpError } = await adminClient.auth.signUp({
+        email: adminEmail,
+        password: adminPassword,
+      });
+
+      if (signUpError) {
+        throw new Error(signUpError.message);
       }
 
-      if (result.warning) {
-        console.warn(result.warning);
+      if (!signUpData?.user) {
+        throw new Error('User creation failed');
+      }
+
+      const userId = signUpData.user.id;
+
+      // Create the admin profile
+      const { error: profileError } = await adminClient
+        .from('profiles')
+        .insert({
+          id: userId,
+          role: 'admin',
+          full_name: 'Admin'
+        });
+
+      if (profileError) {
+        // Profile might already exist from a trigger, try updating instead
+        const { error: updateError } = await adminClient
+          .from('profiles')
+          .update({ role: 'admin' })
+          .eq('id', userId);
+
+        if (updateError) {
+          console.warn('User created but admin role may not be set. Please check manually.');
+        }
       }
 
       markSetupComplete(adminEmail);

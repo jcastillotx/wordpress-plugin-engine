@@ -194,47 +194,31 @@ export default function Setup() {
     }
 
     try {
-      const trimmedUrl = supabaseUrl.trim();
-      const supabase = createClient(trimmedUrl, supabaseAnonKey.trim());
-
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('TIMEOUT')), 20000);
-      });
-
-      const signUpResult = await Promise.race([
-        supabase.auth.signUp({
-          email: adminEmail,
-          password: adminPassword
-        }),
-        timeoutPromise
-      ]) as { data?: any; error?: any };
-
-      if (signUpResult.error) throw signUpResult.error;
-
-      const authData = signUpResult.data;
-
-      if (authData?.user) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            role: 'admin',
-            full_name: 'Admin'
-          });
-
-        if (profileError) {
-          console.error('Profile creation failed:', profileError);
-
-          const { error: updateError } = await supabase
-            .from('profiles')
-            .update({ role: 'admin' })
-            .eq('id', authData.user.id);
-
-          if (updateError) {
-            console.error('Failed to set admin role:', updateError);
-          }
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-admin`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            supabaseUrl: supabaseUrl.trim(),
+            supabaseKey: supabaseAnonKey.trim(),
+            email: adminEmail,
+            password: adminPassword,
+          }),
         }
+      );
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to create admin user');
+      }
+
+      if (result.warning) {
+        console.warn(result.warning);
       }
 
       markSetupComplete(adminEmail);
@@ -242,14 +226,10 @@ export default function Setup() {
     } catch (error: any) {
       let errorMessage = 'Failed to create admin user: ';
 
-      if (error.message === 'TIMEOUT') {
-        errorMessage += 'Connection timed out. Please check your network connection and try again.';
-      } else if (error instanceof TypeError || error.name === 'TypeError') {
-        errorMessage += 'Unable to reach the server. Please check your network connection.';
-      } else if (error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
-        errorMessage += 'Network error. Please check your internet connection.';
+      if (error.message) {
+        errorMessage += error.message;
       } else {
-        errorMessage += error.message || 'Unknown error occurred.';
+        errorMessage += 'Unknown error occurred.';
       }
 
       alert(errorMessage);

@@ -61,9 +61,16 @@ export function DesignToolConnector({ toolName, onConnected }: DesignToolConnect
   const handleConnect = async () => {
     setConnecting(true);
 
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      console.error('No active session');
+      setConnecting(false);
+      return;
+    }
+
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/connect-design-tool`;
     const headers = {
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     };
 

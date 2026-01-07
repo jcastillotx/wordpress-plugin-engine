@@ -52,9 +52,15 @@ export function FileBrowser({ toolName, onSelect, selectedFileId }: FileBrowserP
       return;
     }
 
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      setLoading(false);
+      return;
+    }
+
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-design-files`;
     const headers = {
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     };
 

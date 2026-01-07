@@ -82,38 +82,31 @@ export default function Setup() {
     setConnectionTest({ status: 'testing', message: 'Testing connection...', supabaseType });
 
     try {
-      const testClient = createClient(trimmedUrl, supabaseAnonKey.trim());
-
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('TIMEOUT')), 15000);
-      });
-
-      const result = await Promise.race([
-        testClient.from('_test_').select('*').limit(1),
-        timeoutPromise
-      ]) as { error?: any };
-
-      const error = result?.error;
-
-      // These error messages indicate the connection works (the table just doesn't exist)
-      const successfulConnectionErrors = [
-        'does not exist',
-        'relation "_test_" does not exist',
-        'Could not find the table',
-        'schema cache'
-      ];
-
-      const isConnectionSuccess = !error || successfulConnectionErrors.some(msg =>
-        error.message?.includes(msg) || error.hint?.includes(msg)
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-connection`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            supabaseUrl: trimmedUrl,
+            supabaseKey: supabaseAnonKey.trim(),
+            testType: 'connection',
+          }),
+        }
       );
 
-      if (!isConnectionSuccess) {
-        throw error;
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.error || 'Connection failed');
       }
 
       setConnectionTest({
         status: 'success',
-        message: 'Connection successful!',
+        message: result.message || 'Connection successful!',
         supabaseType
       });
 
@@ -123,29 +116,17 @@ export default function Setup() {
       setTimeout(() => setStep('testing'), 1500);
     } catch (error: any) {
       let errorMessage = 'Connection failed: ';
-      let isCorsError = false;
 
-      if (error.message === 'TIMEOUT') {
-        errorMessage += 'Connection timed out. Please check your URL and network connection.';
-      } else if (error instanceof TypeError || error.name === 'TypeError') {
-        isCorsError = true;
-        errorMessage = 'Unable to connect - likely a CORS issue.';
-      } else if (error.message?.includes('NetworkError') || error.message?.includes('fetch') || error.message?.includes('Failed to fetch')) {
-        isCorsError = true;
-        errorMessage = 'Network error - likely a CORS configuration issue.';
-      } else if (error.message?.includes('Invalid API key') || error.message?.includes('invalid_key')) {
-        errorMessage += 'Invalid API key. Please check your Supabase anon key.';
-      } else if (error.message?.includes('CORS') || error.message?.includes('cross-origin')) {
-        isCorsError = true;
-        errorMessage = 'CORS error detected.';
+      if (error.message) {
+        errorMessage += error.message;
       } else {
-        errorMessage += error.message || 'Unknown error occurred.';
+        errorMessage += 'Unknown error occurred.';
       }
 
       setConnectionTest({
         status: 'error',
         message: errorMessage,
-        corsError: isCorsError,
+        corsError: false,
         supabaseType
       });
     }
@@ -156,56 +137,44 @@ export default function Setup() {
     setMigrationMessage('Checking database setup...');
 
     try {
-      const trimmedUrl = supabaseUrl.trim();
-      const testClient = createClient(trimmedUrl, supabaseAnonKey.trim());
-
-      // Create a timeout promise
-      const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('TIMEOUT')), 15000);
-      });
-
-      const result = await Promise.race([
-        testClient.from('profiles').select('id').limit(1),
-        timeoutPromise
-      ]) as { data?: any; error?: any };
-
-      const { error } = result;
-
-      if (error) {
-        // Check if the error is about missing table (migrations not run)
-        const tableMissingErrors = [
-          'does not exist',
-          'relation "profiles" does not exist',
-          'Could not find the table',
-          'schema cache'
-        ];
-
-        const isTableMissing = tableMissingErrors.some(msg =>
-          error.message?.includes(msg) || error.hint?.includes(msg)
-        ) || error.code === 'PGRST204';
-
-        if (isTableMissing) {
-          setMigrationStatus('error');
-          setMigrationMessage('Database tables not found. Please run migrations first.');
-          return;
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/test-connection`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            supabaseUrl: supabaseUrl.trim(),
+            supabaseKey: supabaseAnonKey.trim(),
+            testType: 'migration',
+          }),
         }
-        throw error;
+      );
+
+      const result = await response.json();
+
+      if (result.migrationNeeded) {
+        setMigrationStatus('error');
+        setMigrationMessage(result.message || 'Database tables not found. Please run migrations first.');
+        return;
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Database check failed');
       }
 
       setMigrationStatus('success');
-      setMigrationMessage('Database is properly configured!');
+      setMigrationMessage(result.message || 'Database is properly configured!');
       setTimeout(() => setStep('admin'), 1500);
     } catch (error: any) {
       let errorMessage = 'Database check failed: ';
 
-      if (error.message === 'TIMEOUT') {
-        errorMessage += 'Connection timed out. Please check your network connection.';
-      } else if (error instanceof TypeError || error.name === 'TypeError') {
-        errorMessage += 'Unable to reach the server. Please check your network connection.';
-      } else if (error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
-        errorMessage += 'Network error. Please check your internet connection.';
+      if (error.message) {
+        errorMessage += error.message;
       } else {
-        errorMessage += error.message || 'Unknown error occurred.';
+        errorMessage += 'Unknown error occurred.';
       }
 
       setMigrationStatus('error');

@@ -207,21 +207,64 @@ export default function Setup() {
       // Create admin user directly using the user-provided credentials
       const adminClient = createClient(trimmedUrl, trimmedKey);
 
-      // Sign up the admin user
-      const { data: signUpData, error: signUpError } = await adminClient.auth.signUp({
-        email: adminEmail,
-        password: adminPassword,
-      });
+      let userId: string | undefined;
 
-      if (signUpError) {
-        throw new Error(signUpError.message);
+      // First, try using the edge function which can auto-confirm email
+      try {
+        const functionsUrl = `${trimmedUrl}/functions/v1/create-admin`;
+        const response = await fetch(functionsUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${trimmedKey}`,
+          },
+          body: JSON.stringify({
+            supabaseUrl: trimmedUrl,
+            supabaseKey: trimmedKey,
+            email: adminEmail,
+            password: adminPassword,
+          }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          userId = result.userId;
+        } else if (result.error) {
+          // Edge function returned an error, fall through to direct signUp
+          console.log('Edge function failed, trying direct signUp:', result.error);
+        }
+      } catch (fetchError) {
+        // Edge function not available, fall through to direct signUp
+        console.log('Edge function not available, using direct signUp');
       }
 
-      if (!signUpData?.user) {
-        throw new Error('User creation failed');
-      }
+      // If edge function didn't work, try direct signUp
+      if (!userId) {
+        const { data: signUpData, error: signUpError } = await adminClient.auth.signUp({
+          email: adminEmail,
+          password: adminPassword,
+        });
 
-      const userId = signUpData.user.id;
+        // Check if this is an email confirmation error - user might still be created
+        if (signUpError) {
+          const errorMsg = signUpError.message?.toLowerCase() || '';
+          const isEmailError = errorMsg.includes('email') &&
+            (errorMsg.includes('confirm') || errorMsg.includes('sending'));
+
+          if (isEmailError && signUpData?.user) {
+            // User was created but email failed - continue with profile creation
+            console.log('Email confirmation failed but user was created, continuing...');
+            userId = signUpData.user.id;
+          } else {
+            throw new Error(signUpError.message);
+          }
+        } else if (!signUpData?.user) {
+          throw new Error('User creation failed');
+        } else {
+          userId = signUpData.user.id;
+        }
+      }
 
       // Create the admin profile
       const { error: profileError } = await adminClient

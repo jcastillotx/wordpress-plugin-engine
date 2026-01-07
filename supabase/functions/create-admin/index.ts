@@ -44,34 +44,86 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const adminClient = createClient(supabaseUrl, supabaseKey);
+    // Get the service role key from environment - required for admin operations
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    const { data: signUpData, error: signUpError } = await adminClient.auth.signUp({
-      email,
-      password,
+    // Use service role key if available (allows auto-confirming email), otherwise fall back to provided key
+    const adminClient = createClient(supabaseUrl, serviceRoleKey || supabaseKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
     });
 
-    if (signUpError) {
-      return new Response(
-        JSON.stringify({ error: signUpError.message }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
+    let userId: string;
 
-    if (!signUpData?.user) {
-      return new Response(
-        JSON.stringify({ error: 'User creation failed' }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
+    // If we have service role key, use admin API to create user with email already confirmed
+    if (serviceRoleKey) {
+      const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true, // Auto-confirm email - no confirmation email needed
+      });
 
-    const userId = signUpData.user.id;
+      if (createError) {
+        return new Response(
+          JSON.stringify({ error: createError.message }),
+          {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      if (!createData?.user) {
+        return new Response(
+          JSON.stringify({ error: 'User creation failed' }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      userId = createData.user.id;
+    } else {
+      // Fall back to regular signUp (may require email confirmation if enabled)
+      const { data: signUpData, error: signUpError } = await adminClient.auth.signUp({
+        email,
+        password,
+      });
+
+      if (signUpError) {
+        // Check if this is an email confirmation error - user might still be created
+        const isEmailError = signUpError.message?.toLowerCase().includes('email') &&
+          (signUpError.message?.toLowerCase().includes('confirm') ||
+           signUpError.message?.toLowerCase().includes('sending'));
+
+        if (isEmailError && signUpData?.user) {
+          // User was created but email failed - continue with profile creation
+          console.log('Email confirmation failed but user was created, continuing...');
+          userId = signUpData.user.id;
+        } else {
+          return new Response(
+            JSON.stringify({ error: signUpError.message }),
+            {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            }
+          );
+        }
+      } else if (!signUpData?.user) {
+        return new Response(
+          JSON.stringify({ error: 'User creation failed' }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      } else {
+        userId = signUpData.user.id;
+      }
+    }
 
     const { error: profileError } = await adminClient
       .from('profiles')

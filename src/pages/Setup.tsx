@@ -95,7 +95,19 @@ export default function Setup() {
 
       const error = result?.error;
 
-      if (error && !error.message?.includes('does not exist')) {
+      // These error messages indicate the connection works (the table just doesn't exist)
+      const successfulConnectionErrors = [
+        'does not exist',
+        'relation "_test_" does not exist',
+        'Could not find the table',
+        'schema cache'
+      ];
+
+      const isConnectionSuccess = !error || successfulConnectionErrors.some(msg =>
+        error.message?.includes(msg) || error.hint?.includes(msg)
+      );
+
+      if (!isConnectionSuccess) {
         throw error;
       }
 
@@ -160,7 +172,19 @@ export default function Setup() {
       const { error } = result;
 
       if (error) {
-        if (error.message?.includes('does not exist') || error.code === 'PGRST204') {
+        // Check if the error is about missing table (migrations not run)
+        const tableMissingErrors = [
+          'does not exist',
+          'relation "profiles" does not exist',
+          'Could not find the table',
+          'schema cache'
+        ];
+
+        const isTableMissing = tableMissingErrors.some(msg =>
+          error.message?.includes(msg) || error.hint?.includes(msg)
+        ) || error.code === 'PGRST204';
+
+        if (isTableMissing) {
           setMigrationStatus('error');
           setMigrationMessage('Database tables not found. Please run migrations first.');
           return;

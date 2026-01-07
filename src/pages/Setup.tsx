@@ -1,13 +1,16 @@
 import { useState } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { CheckCircle, AlertCircle, Loader2, Database, Key, User, Shield } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, Database, Key, User, Shield, ExternalLink, Copy, Check } from 'lucide-react';
 import { markSetupComplete } from '../lib/setupConfig';
 
 type Step = 'welcome' | 'database' | 'testing' | 'migrations' | 'admin' | 'complete';
+type SupabaseType = 'local' | 'cloud' | 'self-hosted' | null;
 
 interface ConnectionTest {
   status: 'idle' | 'testing' | 'success' | 'error';
   message?: string;
+  corsError?: boolean;
+  supabaseType?: SupabaseType;
 }
 
 export default function Setup() {
@@ -19,6 +22,7 @@ export default function Setup() {
   const [adminPassword, setAdminPassword] = useState('');
   const [migrationStatus, setMigrationStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [migrationMessage, setMigrationMessage] = useState('');
+  const [copied, setCopied] = useState<string | null>(null);
 
   const isValidUrl = (url: string): boolean => {
     try {
@@ -26,6 +30,35 @@ export default function Setup() {
       return parsed.protocol === 'https:' || parsed.protocol === 'http:';
     } catch {
       return false;
+    }
+  };
+
+  const detectSupabaseType = (url: string): SupabaseType => {
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname.toLowerCase();
+
+      if (hostname === 'localhost' || hostname === '127.0.0.1' || parsed.port === '54321') {
+        return 'local';
+      }
+
+      if (hostname.includes('.supabase.co')) {
+        return 'cloud';
+      }
+
+      return 'self-hosted';
+    } catch {
+      return null;
+    }
+  };
+
+  const copyToClipboard = async (text: string, id: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(id);
+      setTimeout(() => setCopied(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
     }
   };
 
@@ -45,17 +78,16 @@ export default function Setup() {
       return;
     }
 
-    setConnectionTest({ status: 'testing', message: 'Testing connection...' });
+    const supabaseType = detectSupabaseType(trimmedUrl);
+    setConnectionTest({ status: 'testing', message: 'Testing connection...', supabaseType });
 
     try {
       const testClient = createClient(trimmedUrl, supabaseAnonKey.trim());
 
-      // Create a timeout promise
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('TIMEOUT')), 15000);
       });
 
-      // Race between the actual request and timeout
       const result = await Promise.race([
         testClient.from('_test_').select('*').limit(1),
         timeoutPromise
@@ -67,7 +99,11 @@ export default function Setup() {
         throw error;
       }
 
-      setConnectionTest({ status: 'success', message: 'Connection successful!' });
+      setConnectionTest({
+        status: 'success',
+        message: 'Connection successful!',
+        supabaseType
+      });
 
       localStorage.setItem('VITE_SUPABASE_URL', trimmedUrl);
       localStorage.setItem('VITE_SUPABASE_ANON_KEY', supabaseAnonKey.trim());
@@ -75,25 +111,30 @@ export default function Setup() {
       setTimeout(() => setStep('testing'), 1500);
     } catch (error: any) {
       let errorMessage = 'Connection failed: ';
+      let isCorsError = false;
 
       if (error.message === 'TIMEOUT') {
         errorMessage += 'Connection timed out. Please check your URL and network connection.';
       } else if (error instanceof TypeError || error.name === 'TypeError') {
-        // Network errors often manifest as TypeError
-        errorMessage += 'Unable to reach the server. Please verify the URL is correct and the server is accessible.';
-      } else if (error.message?.includes('NetworkError') || error.message?.includes('fetch')) {
-        errorMessage += 'Network error. Please check your internet connection and verify the Supabase URL is correct.';
+        isCorsError = true;
+        errorMessage = 'Unable to connect - likely a CORS issue.';
+      } else if (error.message?.includes('NetworkError') || error.message?.includes('fetch') || error.message?.includes('Failed to fetch')) {
+        isCorsError = true;
+        errorMessage = 'Network error - likely a CORS configuration issue.';
       } else if (error.message?.includes('Invalid API key') || error.message?.includes('invalid_key')) {
         errorMessage += 'Invalid API key. Please check your Supabase anon key.';
       } else if (error.message?.includes('CORS') || error.message?.includes('cross-origin')) {
-        errorMessage += 'CORS error. The server may not be configured to accept requests from this origin.';
+        isCorsError = true;
+        errorMessage = 'CORS error detected.';
       } else {
-        errorMessage += error.message || 'Unknown error occurred. Please check your credentials and try again.';
+        errorMessage += error.message || 'Unknown error occurred.';
       }
 
       setConnectionTest({
         status: 'error',
-        message: errorMessage
+        message: errorMessage,
+        corsError: isCorsError,
+        supabaseType
       });
     }
   };
@@ -247,6 +288,65 @@ export default function Setup() {
                 </p>
               </div>
 
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
+                <h3 className="font-semibold text-slate-900">Choose Your Supabase Setup:</h3>
+                <div className="space-y-3">
+                  <div className="bg-white border border-slate-200 rounded p-3">
+                    <div className="flex items-start gap-2">
+                      <Database className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-slate-900">Supabase Cloud</h4>
+                        <p className="text-xs text-slate-600 mt-1">Hosted by Supabase - easiest option with automatic CORS management</p>
+                        <a
+                          href="https://supabase.com/dashboard"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 mt-1"
+                        >
+                          Get started <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-slate-200 rounded p-3">
+                    <div className="flex items-start gap-2">
+                      <Database className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-slate-900">Local Development</h4>
+                        <p className="text-xs text-slate-600 mt-1">Run Supabase on your machine - perfect for development</p>
+                        <a
+                          href="https://supabase.com/docs/guides/cli/local-development"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-green-600 hover:text-green-700 mt-1"
+                        >
+                          Setup guide <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white border border-slate-200 rounded p-3">
+                    <div className="flex items-start gap-2">
+                      <Database className="h-5 w-5 text-slate-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <h4 className="font-medium text-slate-900">Self-Hosted</h4>
+                        <p className="text-xs text-slate-600 mt-1">Deploy on your own infrastructure - full control</p>
+                        <a
+                          href="https://supabase.com/docs/guides/self-hosting"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-slate-600 hover:text-slate-700 mt-1"
+                        >
+                          Deployment docs <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h3 className="font-semibold text-blue-900 mb-2">What you'll need:</h3>
                 <ul className="space-y-2 text-sm text-blue-800">
@@ -286,6 +386,15 @@ export default function Setup() {
                 </p>
               </div>
 
+              <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-2 text-sm">
+                <h4 className="font-semibold text-slate-900">Example URLs:</h4>
+                <ul className="space-y-1 text-slate-600">
+                  <li>Cloud: https://abc123xyz.supabase.co</li>
+                  <li>Local: http://localhost:54321</li>
+                  <li>Self-hosted: https://supabase.yourdomain.com</li>
+                </ul>
+              </div>
+
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -298,6 +407,9 @@ export default function Setup() {
                     placeholder="https://your-project.supabase.co"
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Find this in: Supabase Dashboard → Project Settings → API → Project URL
+                  </p>
                 </div>
 
                 <div>
@@ -311,25 +423,161 @@ export default function Setup() {
                     rows={3}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
                   />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Find this in: Supabase Dashboard → Project Settings → API → Project API keys → anon public
+                  </p>
                 </div>
               </div>
 
               {connectionTest.status !== 'idle' && (
-                <div className={`flex items-start gap-3 p-4 rounded-lg ${
-                  connectionTest.status === 'success' ? 'bg-green-50 border border-green-200' :
-                  connectionTest.status === 'error' ? 'bg-red-50 border border-red-200' :
-                  'bg-blue-50 border border-blue-200'
-                }`}>
-                  {connectionTest.status === 'testing' && <Loader2 className="h-5 w-5 text-blue-600 animate-spin flex-shrink-0 mt-0.5" />}
-                  {connectionTest.status === 'success' && <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />}
-                  {connectionTest.status === 'error' && <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />}
-                  <span className={`text-sm ${
-                    connectionTest.status === 'success' ? 'text-green-800' :
-                    connectionTest.status === 'error' ? 'text-red-800' :
-                    'text-blue-800'
+                <div className="space-y-3">
+                  <div className={`flex items-start gap-3 p-4 rounded-lg ${
+                    connectionTest.status === 'success' ? 'bg-green-50 border border-green-200' :
+                    connectionTest.status === 'error' ? 'bg-red-50 border border-red-200' :
+                    'bg-blue-50 border border-blue-200'
                   }`}>
-                    {connectionTest.message}
-                  </span>
+                    {connectionTest.status === 'testing' && <Loader2 className="h-5 w-5 text-blue-600 animate-spin flex-shrink-0 mt-0.5" />}
+                    {connectionTest.status === 'success' && <CheckCircle className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />}
+                    {connectionTest.status === 'error' && <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />}
+                    <span className={`text-sm ${
+                      connectionTest.status === 'success' ? 'text-green-800' :
+                      connectionTest.status === 'error' ? 'text-red-800' :
+                      'text-blue-800'
+                    }`}>
+                      {connectionTest.message}
+                    </span>
+                  </div>
+
+                  {connectionTest.corsError && connectionTest.supabaseType && (
+                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1">
+                          <h4 className="font-semibold text-slate-900 mb-2">CORS Configuration Needed</h4>
+
+                          {connectionTest.supabaseType === 'local' && (
+                            <div className="space-y-3 text-sm text-slate-700">
+                              <p>Your local Supabase needs to allow requests from this domain.</p>
+                              <div>
+                                <p className="font-medium mb-2">Option 1: Update config.toml (Recommended)</p>
+                                <div className="bg-slate-900 rounded p-3 font-mono text-xs text-slate-100 relative">
+                                  <button
+                                    onClick={() => copyToClipboard(`[api]\nadditional_redirect_urls = ["${window.location.origin}"]`, 'config1')}
+                                    className="absolute top-2 right-2 p-1 hover:bg-slate-800 rounded"
+                                  >
+                                    {copied === 'config1' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                  <pre>[api]
+additional_redirect_urls = ["{window.location.origin}"]</pre>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">Add this to your supabase/config.toml and restart: supabase stop && supabase start</p>
+                              </div>
+
+                              <div>
+                                <p className="font-medium mb-2">Option 2: Docker Override</p>
+                                <p className="text-xs">Add to your docker-compose.yml under kong service:</p>
+                                <div className="bg-slate-900 rounded p-3 font-mono text-xs text-slate-100 relative mt-1">
+                                  <button
+                                    onClick={() => copyToClipboard(`KONG_CORS_ORIGINS: "${window.location.origin}"`, 'docker1')}
+                                    className="absolute top-2 right-2 p-1 hover:bg-slate-800 rounded"
+                                  >
+                                    {copied === 'docker1' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                  <pre>KONG_CORS_ORIGINS: "{window.location.origin}"</pre>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          {connectionTest.supabaseType === 'cloud' && (
+                            <div className="space-y-3 text-sm text-slate-700">
+                              <p>Configure CORS in your Supabase Dashboard:</p>
+                              <ol className="list-decimal list-inside space-y-2 ml-2">
+                                <li>Go to your Supabase Dashboard</li>
+                                <li>Navigate to Settings → API</li>
+                                <li>Scroll to "URL Configuration"</li>
+                                <li>Add this origin to allowed origins:
+                                  <div className="bg-slate-900 rounded p-2 font-mono text-xs text-slate-100 relative mt-1">
+                                    <button
+                                      onClick={() => copyToClipboard(window.location.origin, 'origin1')}
+                                      className="absolute top-1 right-1 p-1 hover:bg-slate-800 rounded"
+                                    >
+                                      {copied === 'origin1' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                                    </button>
+                                    {window.location.origin}
+                                  </div>
+                                </li>
+                                <li>Save and try connecting again</li>
+                              </ol>
+                              <a
+                                href="https://supabase.com/dashboard"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium"
+                              >
+                                Open Supabase Dashboard <ExternalLink className="h-4 w-4" />
+                              </a>
+                            </div>
+                          )}
+
+                          {connectionTest.supabaseType === 'self-hosted' && (
+                            <div className="space-y-3 text-sm text-slate-700">
+                              <p>Configure CORS on your self-hosted instance:</p>
+                              <div>
+                                <p className="font-medium mb-2">Add to Kong configuration:</p>
+                                <div className="bg-slate-900 rounded p-3 font-mono text-xs text-slate-100 relative overflow-x-auto">
+                                  <button
+                                    onClick={() => copyToClipboard(`plugins:
+  - name: cors
+    config:
+      origins:
+        - ${window.location.origin}
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - X-Client-Info
+      credentials: false
+      max_age: 3600`, 'kong1')}
+                                    className="absolute top-2 right-2 p-1 hover:bg-slate-800 rounded"
+                                  >
+                                    {copied === 'kong1' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                  </button>
+                                  <pre>{`plugins:
+  - name: cors
+    config:
+      origins:
+        - ${window.location.origin}
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+        - X-Client-Info
+      credentials: false
+      max_age: 3600`}</pre>
+                                </div>
+                                <p className="text-xs text-slate-500 mt-1">Restart Kong after updating: docker-compose restart kong</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -30,11 +30,18 @@ See [INSTALLATION.md](./INSTALLATION.md) for complete deployment instructions.
 
 The application includes an automated setup wizard that runs on first deployment. It guides you through:
 
-1. Configuring database connection
+1. Configuring database connection (with automatic CORS detection)
 2. Running database migrations
 3. Creating your first admin account
 
-After setup completes, the wizard automatically removes itself. See [SETUP_WIZARD.md](./SETUP_WIZARD.md) for details.
+The wizard supports:
+- Supabase Cloud (hosted)
+- Local Supabase development
+- Self-hosted Supabase instances
+
+For detailed instructions on connecting to different Supabase configurations, see [SUPABASE_SETUP_GUIDE.md](./SUPABASE_SETUP_GUIDE.md).
+
+After setup completes, the wizard automatically removes itself. See [SETUP_WIZARD.md](./SETUP_WIZARD.md) for additional details.
 
 ## Deployment Options
 
@@ -68,6 +75,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed instructions on all options.
 
 ### Installation & Deployment
 - [INSTALLATION.md](./INSTALLATION.md) - General installation guide
+- [SUPABASE_SETUP_GUIDE.md](./SUPABASE_SETUP_GUIDE.md) - Supabase connection guide with CORS fixes
 - [CPANEL_INSTALLATION.md](./CPANEL_INSTALLATION.md) - cPanel/AlmaLinux specific guide
 - [CPANEL_QUICK_START.md](./CPANEL_QUICK_START.md) - 5-minute cPanel deployment
 - [DEPLOYMENT.md](./DEPLOYMENT.md) - Deployment options and strategies

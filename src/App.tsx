@@ -183,30 +183,32 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
-function App() {
+export default function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/success" element={<Success />} />
-        <Route
-          path="/"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/pricing"
-          element={
-            <ProtectedRoute>
-              <Pricing />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-    </Router>
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/success" element={<Success />} />
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/pricing"
+            element={
+              <ProtectedRoute>
+                <Pricing />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+      </Router>
+    </AuthProvider>
   )
 }

@@ -15,13 +15,14 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminSubscriptions } from './pages/admin/AdminSubscriptions';
 import { AdminPlugins } from './pages/admin/AdminPlugins';
 import { AdminPages } from './pages/admin/AdminPages';
+import { AdminIntegrations } from './pages/admin/AdminIntegrations';
 import { AdminSettings } from './pages/admin/AdminSettings';
 
 function AppContent() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const [currentView, setCurrentView] = useState<'dashboard' | 'new-plugin' | 'plugins' | 'billing' | 'help' | 'design-to-code' | 'conversions'>('dashboard');
-  const [adminView, setAdminView] = useState<'dashboard' | 'subscriptions' | 'plugins' | 'pages' | 'settings'>('dashboard');
+  const [adminView, setAdminView] = useState<'dashboard' | 'subscriptions' | 'plugins' | 'pages' | 'integrations' | 'settings'>('dashboard');
 
   if (authLoading || adminLoading) {
     return (
@@ -48,6 +49,7 @@ function AppContent() {
           {adminView === 'subscriptions' && <AdminSubscriptions />}
           {adminView === 'plugins' && <AdminPlugins />}
           {adminView === 'pages' && <AdminPages />}
+          {adminView === 'integrations' && <AdminIntegrations />}
           {adminView === 'settings' && <AdminSettings />}
         </main>
       </div>

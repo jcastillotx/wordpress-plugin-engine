@@ -1,9 +1,9 @@
-import { Code2, LayoutDashboard, Users, Package, CreditCard, FileText, Settings, LogOut } from 'lucide-react';
+import { Code2, LayoutDashboard, Users, Package, CreditCard, FileText, Settings, Plug, LogOut } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface AdminNavigationProps {
-  currentView: 'dashboard' | 'subscriptions' | 'plugins' | 'pages' | 'settings';
-  onNavigate: (view: 'dashboard' | 'subscriptions' | 'plugins' | 'pages' | 'settings') => void;
+  currentView: 'dashboard' | 'subscriptions' | 'plugins' | 'pages' | 'integrations' | 'settings';
+  onNavigate: (view: 'dashboard' | 'subscriptions' | 'plugins' | 'pages' | 'integrations' | 'settings') => void;
 }
 
 export function AdminNavigation({ currentView, onNavigate }: AdminNavigationProps) {
@@ -14,6 +14,7 @@ export function AdminNavigation({ currentView, onNavigate }: AdminNavigationProp
     { id: 'subscriptions' as const, label: 'Subscriptions', icon: CreditCard },
     { id: 'plugins' as const, label: 'All Plugins', icon: Package },
     { id: 'pages' as const, label: 'Pages', icon: FileText },
+    { id: 'integrations' as const, label: 'Integrations', icon: Plug },
     { id: 'settings' as const, label: 'Settings', icon: Settings },
   ];
 

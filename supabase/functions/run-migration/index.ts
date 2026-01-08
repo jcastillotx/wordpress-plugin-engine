@@ -1,4 +1,5 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.57.4';
+import { serve } from "https://deno.land/std@0.177.1/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.57.4";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,7 +14,7 @@ interface MigrationRequest {
   filename: string;
 }
 
-Deno.serve(async (req: Request) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
       status: 200,

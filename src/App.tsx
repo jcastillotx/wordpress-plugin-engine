@@ -69,6 +69,7 @@ function AppContent() {
       {currentView === 'help' && <Help />}
     </Layout>
   );
+}
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { SubscriptionStatus } from './components/subscription/SubscriptionStatus';
@@ -207,3 +208,5 @@ function App() {
         />
       </Routes>
     </Router>
+  )
+}

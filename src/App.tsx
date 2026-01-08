@@ -13,6 +13,7 @@ import { Layout } from './components/layout/Layout';
 import { AdminNavigation } from './components/admin/AdminNavigation';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminSubscriptions } from './pages/admin/AdminSubscriptions';
+import { AdminPricing } from './pages/admin/AdminPricing';
 import { AdminPlugins } from './pages/admin/AdminPlugins';
 import { AdminPages } from './pages/admin/AdminPages';
 import { AdminIntegrations } from './pages/admin/AdminIntegrations';
@@ -22,7 +23,7 @@ function AppContent() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const [currentView, setCurrentView] = useState<'dashboard' | 'new-plugin' | 'plugins' | 'billing' | 'help' | 'design-to-code' | 'conversions'>('dashboard');
-  const [adminView, setAdminView] = useState<'dashboard' | 'subscriptions' | 'plugins' | 'pages' | 'integrations' | 'settings'>('dashboard');
+  const [adminView, setAdminView] = useState<'dashboard' | 'subscriptions' | 'pricing' | 'plugins' | 'pages' | 'integrations' | 'settings'>('dashboard');
 
   if (authLoading || adminLoading) {
     return (
@@ -47,6 +48,7 @@ function AppContent() {
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {adminView === 'dashboard' && <AdminDashboard />}
           {adminView === 'subscriptions' && <AdminSubscriptions />}
+          {adminView === 'pricing' && <AdminPricing />}
           {adminView === 'plugins' && <AdminPlugins />}
           {adminView === 'pages' && <AdminPages />}
           {adminView === 'integrations' && <AdminIntegrations />}

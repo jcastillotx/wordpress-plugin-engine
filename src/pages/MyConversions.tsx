@@ -52,19 +52,28 @@ export function MyConversions() {
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-design-conversion`;
     const headers = {
       'Authorization': `Bearer ${session.access_token}`,
+      'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
       'Content-Type': 'application/json',
     };
 
     try {
-      await fetch(apiUrl, {
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify({ conversionId })
       });
 
+      if (!response.ok) {
+        const error = await response.json();
+        console.error('Conversion processing failed:', error);
+        alert('Failed to process conversion. Please try again.');
+        return;
+      }
+
       loadConversions();
     } catch (error) {
       console.error('Error processing conversion:', error);
+      alert('Failed to process conversion. Please try again.');
     }
   };
 

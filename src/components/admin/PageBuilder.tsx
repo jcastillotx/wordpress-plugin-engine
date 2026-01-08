@@ -4,7 +4,7 @@ import { Save, X, Plus, Trash2, MoveUp, MoveDown, Type, Image as ImageIcon, Layo
 
 interface Block {
   id: string;
-  type: 'heading' | 'paragraph' | 'image' | 'cta' | 'html';
+  type: 'heading' | 'paragraph' | 'image' | 'cta' | 'html' | 'hero' | 'features' | 'testimonials' | 'pricing' | 'faq' | 'video' | 'divider' | 'columns';
   content: any;
 }
 
@@ -25,7 +25,15 @@ const BLOCK_TYPES = [
   { type: 'heading', label: 'Heading', icon: Type },
   { type: 'paragraph', label: 'Paragraph', icon: Type },
   { type: 'image', label: 'Image', icon: ImageIcon },
+  { type: 'hero', label: 'Hero Section', icon: Layout },
+  { type: 'features', label: 'Features Grid', icon: Layout },
+  { type: 'testimonials', label: 'Testimonials', icon: Layout },
+  { type: 'pricing', label: 'Pricing Table', icon: Layout },
+  { type: 'faq', label: 'FAQ', icon: Layout },
   { type: 'cta', label: 'Call to Action', icon: Layout },
+  { type: 'video', label: 'Video', icon: ImageIcon },
+  { type: 'columns', label: 'Columns', icon: Layout },
+  { type: 'divider', label: 'Divider', icon: Layout },
   { type: 'html', label: 'HTML', icon: Code },
 ];
 
@@ -55,6 +63,49 @@ export function PageBuilder({ page, onSave, onCancel }: PageBuilderProps) {
         return { text: 'Enter your text here...' };
       case 'image':
         return { url: '', alt: '', caption: '' };
+      case 'hero':
+        return { title: 'Welcome to Our Site', subtitle: 'Build amazing things together', buttonText: 'Get Started', buttonUrl: '#', backgroundImage: '' };
+      case 'features':
+        return {
+          items: [
+            { title: 'Feature 1', description: 'Description here', icon: '✓' },
+            { title: 'Feature 2', description: 'Description here', icon: '✓' },
+            { title: 'Feature 3', description: 'Description here', icon: '✓' }
+          ]
+        };
+      case 'testimonials':
+        return {
+          items: [
+            { quote: 'Great product!', author: 'John Doe', role: 'CEO', avatar: '' },
+            { quote: 'Highly recommend!', author: 'Jane Smith', role: 'Designer', avatar: '' }
+          ]
+        };
+      case 'pricing':
+        return {
+          plans: [
+            { name: 'Basic', price: '9', features: ['Feature 1', 'Feature 2'], buttonText: 'Subscribe', buttonUrl: '#' },
+            { name: 'Pro', price: '29', features: ['Feature 1', 'Feature 2', 'Feature 3'], buttonText: 'Subscribe', buttonUrl: '#', highlighted: true }
+          ]
+        };
+      case 'faq':
+        return {
+          items: [
+            { question: 'Question 1?', answer: 'Answer here' },
+            { question: 'Question 2?', answer: 'Answer here' }
+          ]
+        };
+      case 'video':
+        return { url: '', caption: '' };
+      case 'columns':
+        return {
+          count: 2,
+          columns: [
+            { content: 'Column 1 content' },
+            { content: 'Column 2 content' }
+          ]
+        };
+      case 'divider':
+        return { style: 'solid', width: '100%' };
       case 'cta':
         return { title: 'Call to Action', description: '', buttonText: 'Get Started', buttonUrl: '#' };
       case 'html':
@@ -363,6 +414,254 @@ function BlockEditor({ block, index, totalBlocks, onUpdate, onDelete, onMove }: 
               placeholder="Button URL"
             />
           </div>
+        </div>
+      )}
+
+      {block.type === 'hero' && (
+        <div className="space-y-2">
+          <input
+            type="text"
+            value={block.content.title}
+            onChange={(e) => onUpdate({ ...block.content, title: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            placeholder="Hero Title"
+          />
+          <input
+            type="text"
+            value={block.content.subtitle}
+            onChange={(e) => onUpdate({ ...block.content, subtitle: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            placeholder="Subtitle"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <input
+              type="text"
+              value={block.content.buttonText}
+              onChange={(e) => onUpdate({ ...block.content, buttonText: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="Button Text"
+            />
+            <input
+              type="url"
+              value={block.content.buttonUrl}
+              onChange={(e) => onUpdate({ ...block.content, buttonUrl: e.target.value })}
+              className="px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="Button URL"
+            />
+          </div>
+          <input
+            type="url"
+            value={block.content.backgroundImage}
+            onChange={(e) => onUpdate({ ...block.content, backgroundImage: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            placeholder="Background Image URL (optional)"
+          />
+        </div>
+      )}
+
+      {block.type === 'features' && (
+        <div className="space-y-3">
+          {block.content.items.map((item: any, idx: number) => (
+            <div key={idx} className="p-3 bg-gray-50 rounded border border-gray-200 space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={item.icon}
+                  onChange={(e) => {
+                    const newItems = [...block.content.items];
+                    newItems[idx] = { ...item, icon: e.target.value };
+                    onUpdate({ items: newItems });
+                  }}
+                  className="w-16 px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="Icon"
+                />
+                <input
+                  type="text"
+                  value={item.title}
+                  onChange={(e) => {
+                    const newItems = [...block.content.items];
+                    newItems[idx] = { ...item, title: e.target.value };
+                    onUpdate({ items: newItems });
+                  }}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="Feature Title"
+                />
+              </div>
+              <textarea
+                value={item.description}
+                onChange={(e) => {
+                  const newItems = [...block.content.items];
+                  newItems[idx] = { ...item, description: e.target.value };
+                  onUpdate({ items: newItems });
+                }}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Description"
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => onUpdate({ items: [...block.content.items, { title: 'New Feature', description: '', icon: '✓' }] })}
+            className="text-sm text-blue-600 hover:text-blue-700"
+          >
+            + Add Feature
+          </button>
+        </div>
+      )}
+
+      {block.type === 'testimonials' && (
+        <div className="space-y-3">
+          {block.content.items.map((item: any, idx: number) => (
+            <div key={idx} className="p-3 bg-gray-50 rounded border border-gray-200 space-y-2">
+              <textarea
+                value={item.quote}
+                onChange={(e) => {
+                  const newItems = [...block.content.items];
+                  newItems[idx] = { ...item, quote: e.target.value };
+                  onUpdate({ items: newItems });
+                }}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Testimonial Quote"
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  type="text"
+                  value={item.author}
+                  onChange={(e) => {
+                    const newItems = [...block.content.items];
+                    newItems[idx] = { ...item, author: e.target.value };
+                    onUpdate({ items: newItems });
+                  }}
+                  className="px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="Author Name"
+                />
+                <input
+                  type="text"
+                  value={item.role}
+                  onChange={(e) => {
+                    const newItems = [...block.content.items];
+                    newItems[idx] = { ...item, role: e.target.value };
+                    onUpdate({ items: newItems });
+                  }}
+                  className="px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="Role/Title"
+                />
+              </div>
+            </div>
+          ))}
+          <button
+            onClick={() => onUpdate({ items: [...block.content.items, { quote: '', author: '', role: '', avatar: '' }] })}
+            className="text-sm text-blue-600 hover:text-blue-700"
+          >
+            + Add Testimonial
+          </button>
+        </div>
+      )}
+
+      {block.type === 'video' && (
+        <div className="space-y-2">
+          <input
+            type="url"
+            value={block.content.url}
+            onChange={(e) => onUpdate({ ...block.content, url: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            placeholder="Video URL (YouTube, Vimeo, etc.)"
+          />
+          <input
+            type="text"
+            value={block.content.caption}
+            onChange={(e) => onUpdate({ ...block.content, caption: e.target.value })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            placeholder="Caption (optional)"
+          />
+        </div>
+      )}
+
+      {block.type === 'faq' && (
+        <div className="space-y-3">
+          {block.content.items.map((item: any, idx: number) => (
+            <div key={idx} className="p-3 bg-gray-50 rounded border border-gray-200 space-y-2">
+              <input
+                type="text"
+                value={item.question}
+                onChange={(e) => {
+                  const newItems = [...block.content.items];
+                  newItems[idx] = { ...item, question: e.target.value };
+                  onUpdate({ items: newItems });
+                }}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md font-medium"
+                placeholder="Question"
+              />
+              <textarea
+                value={item.answer}
+                onChange={(e) => {
+                  const newItems = [...block.content.items];
+                  newItems[idx] = { ...item, answer: e.target.value };
+                  onUpdate({ items: newItems });
+                }}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Answer"
+              />
+            </div>
+          ))}
+          <button
+            onClick={() => onUpdate({ items: [...block.content.items, { question: '', answer: '' }] })}
+            className="text-sm text-blue-600 hover:text-blue-700"
+          >
+            + Add FAQ Item
+          </button>
+        </div>
+      )}
+
+      {block.type === 'columns' && (
+        <div className="space-y-2">
+          <select
+            value={block.content.count}
+            onChange={(e) => {
+              const count = parseInt(e.target.value);
+              const columns = Array(count).fill(null).map((_, i) =>
+                block.content.columns[i] || { content: `Column ${i + 1} content` }
+              );
+              onUpdate({ count, columns });
+            }}
+            className="px-3 py-2 border border-gray-300 rounded-md"
+          >
+            <option value={2}>2 Columns</option>
+            <option value={3}>3 Columns</option>
+            <option value={4}>4 Columns</option>
+          </select>
+          <div className="space-y-2">
+            {block.content.columns.map((col: any, idx: number) => (
+              <textarea
+                key={idx}
+                value={col.content}
+                onChange={(e) => {
+                  const newColumns = [...block.content.columns];
+                  newColumns[idx] = { content: e.target.value };
+                  onUpdate({ ...block.content, columns: newColumns });
+                }}
+                rows={3}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder={`Column ${idx + 1} content`}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {block.type === 'divider' && (
+        <div className="space-y-2">
+          <select
+            value={block.content.style}
+            onChange={(e) => onUpdate({ ...block.content, style: e.target.value })}
+            className="px-3 py-2 border border-gray-300 rounded-md"
+          >
+            <option value="solid">Solid Line</option>
+            <option value="dashed">Dashed Line</option>
+            <option value="dotted">Dotted Line</option>
+          </select>
         </div>
       )}
 

@@ -45,10 +45,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get the service role key - prefer from request, then from environment
     const serviceRoleKey = requestServiceKey || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    // Use service role key if available (allows auto-confirming email), otherwise fall back to provided key
     const adminClient = createClient(supabaseUrl, serviceRoleKey || supabaseKey, {
       auth: {
         autoRefreshToken: false,
@@ -58,12 +56,11 @@ Deno.serve(async (req: Request) => {
 
     let userId: string;
 
-    // If we have service role key, use admin API to create user with email already confirmed
     if (serviceRoleKey) {
       const { data: createData, error: createError } = await adminClient.auth.admin.createUser({
         email,
         password,
-        email_confirm: true, // Auto-confirm email - no confirmation email needed
+        email_confirm: true,
       });
 
       if (createError) {
@@ -88,20 +85,17 @@ Deno.serve(async (req: Request) => {
 
       userId = createData.user.id;
     } else {
-      // Fall back to regular signUp (may require email confirmation if enabled)
       const { data: signUpData, error: signUpError } = await adminClient.auth.signUp({
         email,
         password,
       });
 
       if (signUpError) {
-        // Check if this is an email confirmation error - user might still be created
         const isEmailError = signUpError.message?.toLowerCase().includes('email') &&
           (signUpError.message?.toLowerCase().includes('confirm') ||
            signUpError.message?.toLowerCase().includes('sending'));
 
         if (isEmailError && signUpData?.user) {
-          // User was created but email failed - continue with profile creation
           console.log('Email confirmation failed but user was created, continuing...');
           userId = signUpData.user.id;
         } else {

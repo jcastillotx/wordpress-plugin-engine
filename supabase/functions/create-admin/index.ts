@@ -9,6 +9,7 @@ const corsHeaders = {
 interface CreateAdminRequest {
   supabaseUrl: string;
   supabaseKey: string;
+  serviceRoleKey?: string;
   email: string;
   password: string;
 }
@@ -22,7 +23,7 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { supabaseUrl, supabaseKey, email, password }: CreateAdminRequest = await req.json();
+    const { supabaseUrl, supabaseKey, serviceRoleKey: requestServiceKey, email, password }: CreateAdminRequest = await req.json();
 
     if (!supabaseUrl || !supabaseKey || !email || !password) {
       return new Response(
@@ -44,8 +45,8 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get the service role key from environment - required for admin operations
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    // Get the service role key - prefer from request, then from environment
+    const serviceRoleKey = requestServiceKey || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
     // Use service role key if available (allows auto-confirming email), otherwise fall back to provided key
     const adminClient = createClient(supabaseUrl, serviceRoleKey || supabaseKey, {

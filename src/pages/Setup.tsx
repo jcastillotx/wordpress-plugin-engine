@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { createClient } from '@supabase/supabase-js';
-import { CheckCircle, AlertCircle, Loader2, Database, Key, User, Shield, ExternalLink, Copy, Check } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, Database, Key, User, Shield, ExternalLink } from 'lucide-react';
 import { markSetupComplete } from '../lib/setupConfig';
 
 type Step = 'welcome' | 'database' | 'testing' | 'migrations' | 'admin' | 'complete';
@@ -9,7 +8,6 @@ type SupabaseType = 'local' | 'cloud' | 'self-hosted' | null;
 interface ConnectionTest {
   status: 'idle' | 'testing' | 'success' | 'error';
   message?: string;
-  corsError?: boolean;
   supabaseType?: SupabaseType;
 }
 
@@ -20,9 +18,9 @@ export default function Setup() {
   const [connectionTest, setConnectionTest] = useState<ConnectionTest>({ status: 'idle' });
   const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
+  const [serviceRoleKey, setServiceRoleKey] = useState('');
   const [migrationStatus, setMigrationStatus] = useState<'idle' | 'running' | 'success' | 'error'>('idle');
   const [migrationMessage, setMigrationMessage] = useState('');
-  const [copied, setCopied] = useState<string | null>(null);
 
   const isValidUrl = (url: string): boolean => {
     try {
@@ -52,16 +50,6 @@ export default function Setup() {
     }
   };
 
-  const copyToClipboard = async (text: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(id);
-      setTimeout(() => setCopied(null), 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
-
   const testConnection = async () => {
     if (!supabaseUrl || !supabaseAnonKey) {
       setConnectionTest({ status: 'error', message: 'Please fill in all fields' });
@@ -83,26 +71,26 @@ export default function Setup() {
     setConnectionTest({ status: 'testing', message: 'Testing connection...', supabaseType });
 
     try {
-      // Test connection directly using the user-provided credentials
-      const testClient = createClient(trimmedUrl, trimmedKey);
+      // Use edge function to test connection - this avoids CORS issues
+      // Edge functions have wildcard CORS headers (Access-Control-Allow-Origin: *)
+      const functionsUrl = `${trimmedUrl}/functions/v1/test-connection`;
+      const response = await fetch(functionsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${trimmedKey}`,
+        },
+        body: JSON.stringify({
+          supabaseUrl: trimmedUrl,
+          supabaseKey: trimmedKey,
+          testType: 'connection',
+        }),
+      });
 
-      // Try to query a non-existent table - connection success means we can reach Supabase
-      const { error } = await testClient.from('_test_connection_').select('*').limit(1);
+      const result = await response.json();
 
-      // These errors indicate the connection worked but the table doesn't exist (expected)
-      const tableMissingErrors = [
-        'does not exist',
-        'relation "_test_connection_" does not exist',
-        'Could not find the table',
-        'schema cache'
-      ];
-
-      const isConnectionSuccess = !error || tableMissingErrors.some(msg =>
-        error.message?.includes(msg) || error.hint?.includes(msg)
-      );
-
-      if (!isConnectionSuccess) {
-        throw new Error(error?.message || 'Connection failed');
+      if (!result.success) {
+        throw new Error(result.error || 'Connection test failed');
       }
 
       setConnectionTest({
@@ -117,11 +105,9 @@ export default function Setup() {
       setTimeout(() => setStep('testing'), 1500);
     } catch (error: any) {
       let errorMessage = 'Connection failed: ';
-      let isCorsError = false;
 
       if (error.message?.includes('Failed to fetch') || error.message?.includes('NetworkError')) {
-        errorMessage = 'Connection failed: Unable to reach Supabase. Please check your URL and ensure CORS is configured.';
-        isCorsError = true;
+        errorMessage = 'Connection failed: Unable to reach Supabase. Please check your URL is correct and the Supabase instance is running.';
       } else if (error.message) {
         errorMessage += error.message;
       } else {
@@ -131,7 +117,7 @@ export default function Setup() {
       setConnectionTest({
         status: 'error',
         message: errorMessage,
-        corsError: isCorsError,
+        corsError: false,
         supabaseType
       });
     }
@@ -145,31 +131,31 @@ export default function Setup() {
       const trimmedUrl = supabaseUrl.trim();
       const trimmedKey = supabaseAnonKey.trim();
 
-      // Check migrations directly using the user-provided credentials
-      const testClient = createClient(trimmedUrl, trimmedKey);
+      // Use edge function to check migrations - this avoids CORS issues
+      // Edge functions have wildcard CORS headers (Access-Control-Allow-Origin: *)
+      const functionsUrl = `${trimmedUrl}/functions/v1/test-connection`;
+      const response = await fetch(functionsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${trimmedKey}`,
+        },
+        body: JSON.stringify({
+          supabaseUrl: trimmedUrl,
+          supabaseKey: trimmedKey,
+          testType: 'migration',
+        }),
+      });
 
-      // Check if the profiles table exists (indicates migrations have been run)
-      const { error } = await testClient.from('profiles').select('id').limit(1);
+      const result = await response.json();
 
-      if (error) {
-        const tableMissingErrors = [
-          'does not exist',
-          'relation "profiles" does not exist',
-          'Could not find the table',
-          'schema cache'
-        ];
-
-        const isTableMissing = tableMissingErrors.some(msg =>
-          error.message?.includes(msg) || error.hint?.includes(msg)
-        ) || error.code === 'PGRST204';
-
-        if (isTableMissing) {
+      if (!result.success) {
+        if (result.migrationNeeded) {
           setMigrationStatus('error');
           setMigrationMessage('Database tables not found. Please run migrations first.');
           return;
         }
-
-        throw new Error(error.message || 'Database check failed');
+        throw new Error(result.error || 'Database check failed');
       }
 
       setMigrationStatus('success');
@@ -203,88 +189,33 @@ export default function Setup() {
     try {
       const trimmedUrl = supabaseUrl.trim();
       const trimmedKey = supabaseAnonKey.trim();
+      const trimmedServiceKey = serviceRoleKey.trim();
 
-      // Create admin user directly using the user-provided credentials
-      const adminClient = createClient(trimmedUrl, trimmedKey);
-
-      let userId: string | undefined;
-
-      // First, try using the edge function which can auto-confirm email
-      try {
-        const functionsUrl = `${trimmedUrl}/functions/v1/create-admin`;
-        const response = await fetch(functionsUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${trimmedKey}`,
-          },
-          body: JSON.stringify({
-            supabaseUrl: trimmedUrl,
-            supabaseKey: trimmedKey,
-            email: adminEmail,
-            password: adminPassword,
-          }),
-        });
-
-        const result = await response.json();
-
-        if (response.ok && result.success) {
-          userId = result.userId;
-        } else if (result.error) {
-          // Edge function returned an error, fall through to direct signUp
-          console.log('Edge function failed, trying direct signUp:', result.error);
-        }
-      } catch (fetchError) {
-        // Edge function not available, fall through to direct signUp
-        console.log('Edge function not available, using direct signUp');
-      }
-
-      // If edge function didn't work, try direct signUp
-      if (!userId) {
-        const { data: signUpData, error: signUpError } = await adminClient.auth.signUp({
+      // Use edge function to create admin - avoids CORS and can auto-confirm email
+      const functionsUrl = `${trimmedUrl}/functions/v1/create-admin`;
+      const response = await fetch(functionsUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${trimmedKey}`,
+        },
+        body: JSON.stringify({
+          supabaseUrl: trimmedUrl,
+          supabaseKey: trimmedKey,
+          serviceRoleKey: trimmedServiceKey || undefined,
           email: adminEmail,
           password: adminPassword,
-        });
+        }),
+      });
 
-        // Check if this is an email confirmation error - user might still be created
-        if (signUpError) {
-          const errorMsg = signUpError.message?.toLowerCase() || '';
-          const isEmailError = errorMsg.includes('email') &&
-            (errorMsg.includes('confirm') || errorMsg.includes('sending'));
+      const result = await response.json();
 
-          if (isEmailError && signUpData?.user) {
-            // User was created but email failed - continue with profile creation
-            console.log('Email confirmation failed but user was created, continuing...');
-            userId = signUpData.user.id;
-          } else {
-            throw new Error(signUpError.message);
-          }
-        } else if (!signUpData?.user) {
-          throw new Error('User creation failed');
-        } else {
-          userId = signUpData.user.id;
-        }
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to create admin user');
       }
 
-      // Create the admin profile
-      const { error: profileError } = await adminClient
-        .from('profiles')
-        .insert({
-          id: userId,
-          role: 'admin',
-          full_name: 'Admin'
-        });
-
-      if (profileError) {
-        // Profile might already exist from a trigger, try updating instead
-        const { error: updateError } = await adminClient
-          .from('profiles')
-          .update({ role: 'admin' })
-          .eq('id', userId);
-
-        if (updateError) {
-          console.warn('User created but admin role may not be set. Please check manually.');
-        }
+      if (result.warning) {
+        console.warn(result.warning);
       }
 
       markSetupComplete(adminEmail);
@@ -335,7 +266,7 @@ export default function Setup() {
                       <Database className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
                       <div>
                         <h4 className="font-medium text-slate-900">Supabase Cloud</h4>
-                        <p className="text-xs text-slate-600 mt-1">Hosted by Supabase - easiest option with automatic CORS management</p>
+                        <p className="text-xs text-slate-600 mt-1">Hosted by Supabase - easiest option to get started</p>
                         <a
                           href="https://supabase.com/dashboard"
                           target="_blank"
@@ -353,7 +284,7 @@ export default function Setup() {
                       <Database className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
                       <div>
                         <h4 className="font-medium text-slate-900">Local Development</h4>
-                        <p className="text-xs text-slate-600 mt-1">Run Supabase on your machine - perfect for development</p>
+                        <p className="text-xs text-slate-600 mt-1">Run Supabase locally - perfect for development</p>
                         <a
                           href="https://supabase.com/docs/guides/cli/local-development"
                           target="_blank"
@@ -371,7 +302,7 @@ export default function Setup() {
                       <Database className="h-5 w-5 text-slate-600 flex-shrink-0 mt-0.5" />
                       <div>
                         <h4 className="font-medium text-slate-900">Self-Hosted</h4>
-                        <p className="text-xs text-slate-600 mt-1">Deploy on your own infrastructure - full control</p>
+                        <p className="text-xs text-slate-600 mt-1">Deploy on your own server - full control</p>
                         <a
                           href="https://supabase.com/docs/guides/self-hosting"
                           target="_blank"
@@ -487,136 +418,6 @@ export default function Setup() {
                     </span>
                   </div>
 
-                  {connectionTest.corsError && connectionTest.supabaseType && (
-                    <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                        <div className="flex-1">
-                          <h4 className="font-semibold text-slate-900 mb-2">CORS Configuration Needed</h4>
-
-                          {connectionTest.supabaseType === 'local' && (
-                            <div className="space-y-3 text-sm text-slate-700">
-                              <p>Your local Supabase needs to allow requests from this domain.</p>
-                              <div>
-                                <p className="font-medium mb-2">Option 1: Update config.toml (Recommended)</p>
-                                <div className="bg-slate-900 rounded p-3 font-mono text-xs text-slate-100 relative">
-                                  <button
-                                    onClick={() => copyToClipboard(`[api]\nadditional_redirect_urls = ["${window.location.origin}"]`, 'config1')}
-                                    className="absolute top-2 right-2 p-1 hover:bg-slate-800 rounded"
-                                  >
-                                    {copied === 'config1' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                  </button>
-                                  <pre>[api]
-additional_redirect_urls = ["{window.location.origin}"]</pre>
-                                </div>
-                                <p className="text-xs text-slate-500 mt-1">Add this to your supabase/config.toml and restart: supabase stop && supabase start</p>
-                              </div>
-
-                              <div>
-                                <p className="font-medium mb-2">Option 2: Docker Override</p>
-                                <p className="text-xs">Add to your docker-compose.yml under kong service:</p>
-                                <div className="bg-slate-900 rounded p-3 font-mono text-xs text-slate-100 relative mt-1">
-                                  <button
-                                    onClick={() => copyToClipboard(`KONG_CORS_ORIGINS: "${window.location.origin}"`, 'docker1')}
-                                    className="absolute top-2 right-2 p-1 hover:bg-slate-800 rounded"
-                                  >
-                                    {copied === 'docker1' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                  </button>
-                                  <pre>KONG_CORS_ORIGINS: "{window.location.origin}"</pre>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {connectionTest.supabaseType === 'cloud' && (
-                            <div className="space-y-3 text-sm text-slate-700">
-                              <p>Configure CORS in your Supabase Dashboard:</p>
-                              <ol className="list-decimal list-inside space-y-2 ml-2">
-                                <li>Go to your Supabase Dashboard</li>
-                                <li>Navigate to Settings → API</li>
-                                <li>Scroll to "URL Configuration"</li>
-                                <li>Add this origin to allowed origins:
-                                  <div className="bg-slate-900 rounded p-2 font-mono text-xs text-slate-100 relative mt-1">
-                                    <button
-                                      onClick={() => copyToClipboard(window.location.origin, 'origin1')}
-                                      className="absolute top-1 right-1 p-1 hover:bg-slate-800 rounded"
-                                    >
-                                      {copied === 'origin1' ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                                    </button>
-                                    {window.location.origin}
-                                  </div>
-                                </li>
-                                <li>Save and try connecting again</li>
-                              </ol>
-                              <a
-                                href="https://supabase.com/dashboard"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 font-medium"
-                              >
-                                Open Supabase Dashboard <ExternalLink className="h-4 w-4" />
-                              </a>
-                            </div>
-                          )}
-
-                          {connectionTest.supabaseType === 'self-hosted' && (
-                            <div className="space-y-3 text-sm text-slate-700">
-                              <p>Configure CORS on your self-hosted instance:</p>
-                              <div>
-                                <p className="font-medium mb-2">Add to Kong configuration:</p>
-                                <div className="bg-slate-900 rounded p-3 font-mono text-xs text-slate-100 relative overflow-x-auto">
-                                  <button
-                                    onClick={() => copyToClipboard(`plugins:
-  - name: cors
-    config:
-      origins:
-        - ${window.location.origin}
-      methods:
-        - GET
-        - POST
-        - PUT
-        - PATCH
-        - DELETE
-        - OPTIONS
-      headers:
-        - Accept
-        - Authorization
-        - Content-Type
-        - X-Client-Info
-      credentials: false
-      max_age: 3600`, 'kong1')}
-                                    className="absolute top-2 right-2 p-1 hover:bg-slate-800 rounded"
-                                  >
-                                    {copied === 'kong1' ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                                  </button>
-                                  <pre>{`plugins:
-  - name: cors
-    config:
-      origins:
-        - ${window.location.origin}
-      methods:
-        - GET
-        - POST
-        - PUT
-        - PATCH
-        - DELETE
-        - OPTIONS
-      headers:
-        - Accept
-        - Authorization
-        - Content-Type
-        - X-Client-Info
-      credentials: false
-      max_age: 3600`}</pre>
-                                </div>
-                                <p className="text-xs text-slate-500 mt-1">Restart Kong after updating: docker-compose restart kong</p>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -749,6 +550,22 @@ additional_redirect_urls = ["{window.location.origin}"]</pre>
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                   <p className="text-xs text-slate-500 mt-1">Must be at least 8 characters long</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Service Role Key <span className="text-slate-400 font-normal">(recommended)</span>
+                  </label>
+                  <textarea
+                    value={serviceRoleKey}
+                    onChange={(e) => setServiceRoleKey(e.target.value)}
+                    placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                    rows={3}
+                    className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Required to skip email verification. Find this in: Supabase Dashboard → Project Settings → API → service_role key
+                  </p>
                 </div>
               </div>
 

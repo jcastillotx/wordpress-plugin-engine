@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useAdmin } from './hooks/useAdmin';
 import { Auth } from './pages/Auth';
@@ -16,24 +16,12 @@ import { AdminSubscriptions } from './pages/admin/AdminSubscriptions';
 import { AdminPlugins } from './pages/admin/AdminPlugins';
 import { AdminPages } from './pages/admin/AdminPages';
 import { AdminSettings } from './pages/admin/AdminSettings';
-import Setup from './pages/Setup';
-import { checkSetupComplete } from './lib/setupConfig';
 
 function AppContent() {
   const { user, loading: authLoading } = useAuth();
   const { isAdmin, loading: adminLoading } = useAdmin();
   const [currentView, setCurrentView] = useState<'dashboard' | 'new-plugin' | 'plugins' | 'billing' | 'help' | 'design-to-code' | 'conversions'>('dashboard');
   const [adminView, setAdminView] = useState<'dashboard' | 'subscriptions' | 'plugins' | 'pages' | 'settings'>('dashboard');
-  const [setupComplete, setSetupComplete] = useState(checkSetupComplete());
-
-  useEffect(() => {
-    const isComplete = checkSetupComplete();
-    setSetupComplete(isComplete);
-  }, []);
-
-  if (!setupComplete) {
-    return <Setup />;
-  }
 
   if (authLoading || adminLoading) {
     return (
